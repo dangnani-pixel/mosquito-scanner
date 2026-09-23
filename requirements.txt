@@ -1,0 +1,8 @@
+# Model conversion only (the web app itself has no build step).
+# Install CPU torch first: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch>=2.1
+torchvision
+ultralytics==8.3.65
+onnx>=1.16
+onnxruntime>=1.18
+numpy
