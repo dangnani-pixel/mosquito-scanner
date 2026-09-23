@@ -1,0 +1,15 @@
+Mosquito Scanner 0.3
+Application source: source.zip, AGPL-3.0-or-later. License: LICENSE.txt.
+Model: YOLito by Evyatar Sar-Shalom and collaborators.
+Source: https://github.com/WildMosquit0/YOLito
+Paper: https://doi.org/10.1101/2025.11.20.689454
+Original weights: weights/best.pt, SHA256 cbcc0812977a81958a849d249d19246069596acaa2799b832de86e0cce7e0841.
+Original checkpoint metadata specifies AGPL-3.0 (Ultralytics).
+Architecture: YOLO11l, one detection class. Original class name '1' is displayed as 'mosquito estimate' based on the model repository's mosquito detection purpose.
+Converted with Ultralytics 8.3.65 to ONNX opset 17 at 640x640. Float32 initializers stored as float16 with Cast nodes restoring float32 for WebAssembly execution. This is a format conversion, not newly trained on household images.
+App preprocessing: RGB / 255; letterbox 114; 640x640; full-image plus overlapping tile inference; confidence threshold selectable; IoU NMS 0.35.
+Model and runtime are served locally by this site. No photos or microphone recordings are transmitted.
+Model loading requires approximately 49 MB plus 11 MB runtime. Memory and speed vary by browser/device.
+Research demonstration image used in development: https://github.com/WildMosquit0/YOLito/blob/main/demo/dead.jpeg
+A successful demonstration-image check does not establish accuracy on new indoor images.
+ONNX Runtime Web 1.22.0: Microsoft, MIT License, vendor/ONNXRUNTIME-LICENSE.txt.

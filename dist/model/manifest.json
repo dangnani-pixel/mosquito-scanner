@@ -1,0 +1,1 @@
+{"size": 50902489, "parts": ["yolito-00.bin", "yolito-01.bin", "yolito-02.bin", "yolito-03.bin", "yolito-04.bin", "yolito-05.bin", "yolito-06.bin"], "sha256": "53814fc4dde5f698f4347ee72dbfec9e21ae33ab81ce4f22829110308ee67c2b", "input": [1, 3, 640, 640], "output": [1, 5, 8400], "source": "https://github.com/WildMosquit0/YOLito", "class": "mosquito", "license": "AGPL-3.0"}
