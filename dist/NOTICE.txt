@@ -7,7 +7,7 @@ Original weights: weights/best.pt, SHA256 cbcc0812977a81958a849d249d19246069596a
 Original checkpoint metadata specifies AGPL-3.0 (Ultralytics).
 Architecture: YOLO11l, one detection class. Original class name '1' is displayed as 'mosquito estimate' based on the model repository's mosquito detection purpose.
 Converted with Ultralytics 8.3.65 to ONNX opset 17 at 640x640. Float32 initializers stored as float16 with Cast nodes restoring float32 for WebAssembly execution. This is a format conversion, not newly trained on household images.
-App preprocessing: RGB / 255; letterbox 114; 640x640; full-image plus overlapping tile inference; confidence threshold selectable; IoU NMS 0.35 plus containment merge 0.7 for tile-edge duplicates; photo long side capped at 1920 px.
+App preprocessing: RGB / 255; letterbox 114; 640x640; full-image plus overlapping tile inference; confidence threshold selectable; IoU NMS 0.35 plus containment merge 0.7 for tile-edge duplicates; up to 10 small dark spots re-analyzed on enlarged crops, and tap-to-zoom on a tapped dark spot; photo long side capped at 1920 px.
 Model and runtime are served locally by this site. No photos or microphone recordings are transmitted. Downloaded model parts are verified against the manifest SHA-256 and kept in browser Cache Storage.
 Model loading requires approximately 49 MB plus 11 MB runtime. Memory and speed vary by browser/device.
 Research demonstration image used in development: https://github.com/WildMosquit0/YOLito/blob/main/demo/dead.jpeg
