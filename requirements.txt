@@ -6,3 +6,4 @@ ultralytics==8.3.65
 onnx>=1.16
 onnxruntime>=1.18
 numpy
+h5py  # export_humbug.py (sound model)

@@ -1,0 +1,34 @@
+/* AGPL-3.0-or-later. HumBug MozzBNN mosquito wingbeat detector (MIT, University of Oxford) running on device.
+   Reproduces MozzBNN's librosa pipeline: 8 kHz, STFT 2048 / hop 512 (Hann, centred, reflect pad),
+   128 Slaney mel bands, power_to_db(ref=max, top_db=80), per-window standardisation, 30 frames = 1.92 s. */
+importScripts('vendor/ort.wasm.min.js');
+const SR=8000,NFFT=2048,HOP=512,NMEL=128,WIN=30,SEG=WIN*HOP,NBIN=NFFT/2+1,MC=10,CACHE_PREFIX='mosquito-sound-';
+let session,loading,queue=Promise.resolve();
+
+/* ---------- model loading (hash-checked, Cache Storage) ---------- */
+async function sha256(bytes){if(!self.crypto?.subtle)return null;const h=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(h),b=>b.toString(16).padStart(2,'0')).join('')}
+async function init(){if(session)return;if(loading)return loading;loading=(async()=>{ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths=new URL('vendor/',self.location.href).href;const r=await fetch('model/humbug-manifest.json',{cache:'no-cache'});if(!r.ok)throw Error('소리 AI 정보를 읽을 수 없습니다');const meta=await r.json(),url=new URL('model/'+meta.file,self.location.href).href;let cache=null,hit=null;try{if(self.caches){const name=CACHE_PREFIX+meta.sha256.slice(0,16);cache=await caches.open(name);for(const k of await caches.keys())if(k.startsWith(CACHE_PREFIX)&&k!==name)caches.delete(k).catch(()=>{});hit=await cache.match(url)}}catch{cache=null}postMessage({progress:hit?'저장된 소리 AI 불러오는 중':'소리 AI 다운로드 중 · 약 2 MB'});const res=hit||await fetch(url);if(!res.ok)throw Error('소리 AI 다운로드 실패');const bytes=new Uint8Array(await res.arrayBuffer());if(bytes.length!==meta.size)throw Error('소리 AI 크기 불일치');const hash=await sha256(bytes);if(hash&&hash!==meta.sha256){if(cache)await caches.delete(CACHE_PREFIX+meta.sha256.slice(0,16)).catch(()=>{});throw Error('소리 AI 파일이 손상되었습니다. 새로고침 후 다시 시도하세요')}if(cache&&hash&&!hit)cache.put(url,new Response(bytes.slice())).catch(()=>{});session=await ort.InferenceSession.create(bytes,{executionProviders:['wasm']})})().catch(e=>{loading=null;throw e});return loading}
+
+/* ---------- resampling to 8 kHz (windowed-sinc, anti-aliased) ---------- */
+const kernels=new Map(),RES=64;
+function kernel(rate){if(!kernels.has(rate)){const fc=Math.min(1,SR/rate)*0.95,half=16/fc,tbl=new Float32Array(Math.ceil(half*RES)+2);for(let i=0;i<tbl.length;i++){const d=i/RES,a=Math.PI*fc*d;tbl[i]=d>=half?0:(d===0?1:Math.sin(a)/a)*(0.5+0.5*Math.cos(Math.PI*d/half))}kernels.set(rate,{half,tbl})}return kernels.get(rate)}
+function resample(x,rate){if(rate===SR)return x.length===SEG?x:x.subarray(x.length-SEG);const ratio=rate/SR,{half,tbl}=kernel(rate),out=new Float32Array(SEG),start=x.length-SEG*ratio;for(let n=0;n<SEG;n++){const t=start+n*ratio,k0=Math.max(0,Math.ceil(t-half)),k1=Math.min(x.length-1,Math.floor(t+half));let s=0,ws=0;for(let k=k0;k<=k1;k++){const w=tbl[Math.round(Math.abs(t-k)*RES)];s+=x[k]*w;ws+=w}out[n]=ws?s/ws:0}return out}
+
+/* ---------- FFT + mel filterbank (librosa-compatible) ---------- */
+const hann=new Float32Array(NFFT).map((_,n)=>0.5-0.5*Math.cos(2*Math.PI*n/NFFT));
+const rev=new Uint32Array(NFFT);for(let i=0,bits=Math.log2(NFFT);i<NFFT;i++){let r=0;for(let b=0;b<bits;b++)r|=((i>>b)&1)<<(bits-1-b);rev[i]=r}
+const cosT=new Float64Array(NFFT/2),sinT=new Float64Array(NFFT/2);for(let i=0;i<NFFT/2;i++){cosT[i]=Math.cos(2*Math.PI*i/NFFT);sinT[i]=-Math.sin(2*Math.PI*i/NFFT)}
+function fftPower(frame,out){const re=new Float64Array(NFFT),im=new Float64Array(NFFT);for(let i=0;i<NFFT;i++)re[rev[i]]=frame[i];for(let size=2;size<=NFFT;size*=2){const h=size/2,step=NFFT/size;for(let i=0;i<NFFT;i+=size)for(let j=0;j<h;j++){const c=cosT[j*step],s=sinT[j*step],a=i+j,b=a+h,tr=re[b]*c-im[b]*s,ti=re[b]*s+im[b]*c;re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti}}for(let k=0;k<NBIN;k++)out[k]=re[k]*re[k]+im[k]*im[k]}
+const hzToMel=f=>f<1000?f*3/200:15+Math.log(f/1000)/(Math.log(6.4)/27),melToHz=m=>m<15?m*200/3:1000*Math.exp(Math.log(6.4)/27*(m-15));
+const melFB=(()=>{const top=hzToMel(SR/2),mf=Array.from({length:NMEL+2},(_,i)=>melToHz(top*i/(NMEL+1))),fb=[];for(let m=0;m<NMEL;m++){const w=new Float32Array(NBIN),en=2/(mf[m+2]-mf[m]);for(let k=0;k<NBIN;k++){const f=k*SR/NFFT,lo=(f-mf[m])/(mf[m+1]-mf[m]),hi=(mf[m+2]-f)/(mf[m+2]-mf[m+1]);w[k]=Math.max(0,Math.min(lo,hi))*en}let a=0;while(a<NBIN&&!w[a])a++;let b=NBIN-1;while(b>a&&!w[b])b--;fb.push({a,w:w.subarray(a,b+1)})}return fb})();
+function features(y){const frame=new Float32Array(NFFT),pw=new Float64Array(NBIN),mel=new Float32Array(WIN*NMEL),avg=new Float64Array(NBIN),pad=NFFT/2,L=y.length,at=i=>i<0?y[-i]:i>=L?y[2*L-2-i]:y[i];for(let t=0;t<WIN;t++){for(let n=0;n<NFFT;n++)frame[n]=at(t*HOP+n-pad)*hann[n];fftPower(frame,pw);for(let k=0;k<NBIN;k++)avg[k]+=pw[k]/WIN;for(let m=0;m<NMEL;m++){const {a,w}=melFB[m];let s=0;for(let k=0;k<w.length;k++)s+=w[k]*pw[a+k];mel[t*NMEL+m]=s}}
+ /* power_to_db(ref=np.max, amin=1e-10, top_db=80) then standardise over the window */
+ let mx=1e-10;for(const v of mel)if(v>mx)mx=v;const ref=10*Math.log10(mx);let sum=0;for(let i=0;i<mel.length;i++){mel[i]=Math.max(10*Math.log10(Math.max(1e-10,mel[i]))-ref,-80);sum+=mel[i]}const mean=sum/mel.length;let v2=0;for(const v of mel)v2+=(v-mean)**2;const sd=Math.sqrt(v2/mel.length)||1;for(let i=0;i<mel.length;i++)mel[i]=(mel[i]-mean)/sd;
+ /* wingbeat peak: strongest bin in 250–1000 Hz vs band median (dB) */
+ const lo=Math.ceil(250*NFFT/SR),hi=Math.floor(1000*NFFT/SR),band=[];let best=-Infinity,bestK=lo;for(let k=lo;k<=hi;k++){const d=10*Math.log10(avg[k]+1e-12);band.push(d);if(d>best){best=d;bestK=k}}band.sort((a,b)=>a-b);const med=band.length%2?band[band.length>>1]:(band[band.length/2-1]+band[band.length/2])/2;
+ let rms=0;for(const v of y)rms+=v*v;return {mel,prominence:best-med,peakHz:bestK*SR/NFFT,rms:Math.sqrt(rms/L)}}
+
+/* ---------- Monte Carlo dropout inference ---------- */
+async function predict(mel){const batch=new Float32Array(MC*mel.length);for(let i=0;i<MC;i++)batch.set(mel,i*mel.length);const input=new ort.Tensor('float32',batch,[MC,1,WIN,NMEL]);let result;try{result=await session.run({[session.inputNames[0]]:input});const p=result[session.outputNames[0]].data,ent=q=>-(q>0?q*Math.log2(q):0)-(q<1?(1-q)*Math.log2(1-q):0);let mean=0,avgEnt=0;for(let i=0;i<MC;i++){const q=p[i*2+1];mean+=q/MC;avgEnt+=ent(Math.min(1,Math.max(0,q)))/MC}const pe=ent(mean);return {p:mean,pe,mi:Math.max(0,pe-avgEnt)}}finally{input.dispose?.();if(result)Object.values(result).forEach(t=>t.dispose?.())}}
+
+onmessage=e=>{const msg=e.data;queue=queue.then(async()=>{try{await init();if(msg.type==='init'){postMessage({id:msg.id,ok:true});return}const y=resample(msg.samples,msg.rate),f=features(y),r=await predict(f.mel);postMessage({id:msg.id,...r,prominence:f.prominence,peakHz:f.peakHz,rms:f.rms,...(msg.debug?{mel:f.mel}:{})})}catch(err){postMessage({id:msg.id,error:err.message||String(err)})}})};

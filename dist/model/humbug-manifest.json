@@ -1,0 +1,29 @@
+{
+ "file": "humbug-med.onnx",
+ "size": 2077815,
+ "sha256": "b4488d48295ab79b29544929071ab9d58f81605ce464f763ada5808945dc1ec9",
+ "input": [
+  null,
+  1,
+  30,
+  128
+ ],
+ "output": [
+  null,
+  2
+ ],
+ "classes": [
+  "background",
+  "mosquito"
+ ],
+ "sr": 8000,
+ "n_fft": 2048,
+ "hop": 512,
+ "n_mels": 128,
+ "win": 30,
+ "mc_samples": 10,
+ "source": "https://github.com/HumBug-Mosquito/MozzBNN",
+ "weights": "neurips_2021_humbugdb_keras_bnn_best.hdf5",
+ "weights_sha256": "f2e81a8a5869e1fd1329db29bed68549db9cad8d4e1000ae415a5ac5f1c2a321",
+ "license": "MIT"
+}

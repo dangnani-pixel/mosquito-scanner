@@ -2,3 +2,4 @@ __pycache__/
 *.pt
 *.onnx
 /dist/source.zip
+!/dist/model/humbug-med.onnx

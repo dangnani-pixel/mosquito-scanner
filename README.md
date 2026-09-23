@@ -1,5 +1,5 @@
 # Mosquito Scanner 0.4
-Client-only mosquito image detection with YOLito / YOLO11l, ONNX Runtime Web 1.22.0.
+Client-only mosquito image detection with YOLito / YOLO11l and wingbeat sound detection with HumBug MozzBNN, both on ONNX Runtime Web 1.22.0.
 Source and original checkpoint metadata license: AGPL-3.0. See LICENSE and dist/NOTICE.txt.
 
 Live site (GitHub Pages): https://dangnani-pixel.github.io/mosquito-scanner/
@@ -27,6 +27,23 @@ Run `python export_model.py yolito.pt`, then `python compact_model.py yolito.onn
 Export uses the legacy torch ONNX exporter (`dynamo=False` when the installed torch supports that argument), opset17, 640x640, one class. Compact stores float initializers as half with Cast nodes back to float, splits the model into 8 MiB parts and writes size + SHA-256 to `manifest.json`. Works on Windows (no temp-path assumptions); old `yolito-*.bin` parts in the output folder are removed first.
 Use ONNX Runtime Web 1.22.0 dist/ort.wasm.min.js, ort-wasm-simd-threaded.mjs and ort-wasm-simd-threaded.wasm in dist/vendor. Use one WASM thread for iOS and no cross-origin isolation dependency.
 Upstream model training/inference source: https://github.com/WildMosquit0/YOLito and https://github.com/ultralytics/ultralytics/tree/v8.3.65.
+
+## Sound AI (HumBug MozzBNN)
+The microphone panel runs the HumBug mosquito event detector (University of Oxford, MIT license; https://github.com/HumBug-Mosquito/MozzBNN, paper: HumBugDB, NeurIPS 2021) on device. Only detection (mosquito vs background) is used; species classification is not included (its models are GB-scale and trained on lab/African field species).
+
+- `dist/audio-tap.js` (AudioWorklet) forwards raw mic samples; `dist/sound-ai.js` keeps the last 2.1 s and analyses it every 0.5 s in `dist/sound-worker.js`.
+- The worker resamples to 8 kHz (windowed sinc), reproduces MozzBNN's librosa features exactly (STFT 2048/512 Hann centred reflect, 128 Slaney mel, power_to_db ref=max top_db=80, standardisation) over one 1.92 s window (30 frames), and runs the model 10 times in one batch with dropout active (Monte Carlo, like the original BNN) to get the mean probability, predictive entropy and mutual information.
+- The original pipeline standardises over a whole recording; live we standardise per window. On MozzBNN's sample recording this agrees with the published output for 96.8% of windows (99.1% with whole-recording normalisation).
+- Per-window standardisation removes loudness, and in synthetic tests broadband low-frequency (brown) noise was scored as mosquito. The app therefore also requires a 250–1000 Hz spectral peak ≥ 9.5 dB above the band median (kept 96–99% of mosquito windows in the sample, rejected white/brown noise), and two hits in the last three analyses.
+- JS features were checked against librosa: identical at 8 kHz; mean abs difference 0.06 (standardised units) after 48 kHz → 8 kHz resampling. About 65 ms per analysis on the development PC.
+
+Rebuild the ONNX model (2 MB) from the original Keras weights (the Keras file's MC-dropout lambdas are Python 3.7 bytecode, so the graph is rebuilt from weights instead of loaded):
+
+```
+pip install h5py numpy onnx
+curl -LO https://github.com/HumBug-Mosquito/HumBugDB/releases/download/v1.0/neurips_2021_humbugdb_keras_bnn_best.hdf5
+python export_humbug.py neurips_2021_humbugdb_keras_bnn_best.hdf5 dist/model
+```
 
 ## Model loading
 The worker downloads the parts listed in `model/manifest.json`, checks total size and SHA-256 (when `crypto.subtle` is available, i.e. HTTPS/localhost), and only then stores the parts in Cache Storage under a hash-specific name. Later visits load from that cache; a new model hash replaces the old cache. A corrupted download is rejected and not cached.
