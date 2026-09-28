@@ -37,6 +37,9 @@ The microphone panel runs the HumBug mosquito event detector (University of Oxfo
 - Per-window standardisation removes loudness, and in synthetic tests broadband low-frequency (brown) noise was scored as mosquito. The app therefore also requires a 250–1000 Hz spectral peak ≥ 9.5 dB above the band median (kept 96–99% of mosquito windows in the sample, rejected white/brown noise), and two hits in the last three analyses.
 - JS features were checked against librosa: identical at 8 kHz; mean abs difference 0.06 (standardised units) after 48 kHz → 8 kHz resampling. About 65 ms per analysis on the development PC.
 
+Proximity meter ("가까움"): the app reads one microphone channel, so direction cannot be computed. After an AI hit (the same AI + spectral-peak rule above), the meter locks onto the wingbeat frequency (tracked ±40 Hz) and shows, on every animation frame, how far that tone stands above the 250–1000 Hz band median (0–30 dB bar, 0.6 s time-constant smoothing). A 1.5 s change of more than 3 dB is shown as stronger/weaker, so the user can sweep the phone and follow the stronger direction. Only AI hits refresh the lock (5 s), so fans or tones the AI rejects cannot hold the meter.
+Test (headless Chromium, fake microphone): MozzBNN sample recording 400–436 s (labelled mosquito) with a -12 → 0 → -24 dB volume envelope. Meter level correlated 0.69 with the envelope; stronger/weaker labels pointed the wrong way in about 20% of 0.5 s readings (the recording's own loudness fluctuates as the mosquito moves). A 500 Hz tone + 120 Hz hum + brown noise never turned the meter on. Not tested on a phone or a live mosquito; loudness also changes with phone orientation and hand position.
+
 Rebuild the ONNX model (2 MB) from the original Keras weights (the Keras file's MC-dropout lambdas are Python 3.7 bytecode, so the graph is rebuilt from weights instead of loaded):
 
 ```
@@ -52,7 +55,7 @@ The worker downloads the parts listed in `model/manifest.json`, checks total siz
 Converted model tested on upstream demo/dead.jpeg and a plain image. Native ORT maximum scores: 0.8525 and 0.0011 respectively. WebAssembly ORT test on the same photograph maximum 0.8525; one full-frame pass on the development host took approximately 4.8 seconds. These are execution checks, not accuracy evaluation. Model has NOT been validated on the user's room or iPhone. Source metadata's class label is '1'; mapped to mosquito estimate based on repository task.
 
 ## Scope
-Detects visual mosquito candidates in captured photos, including stationary objects. No sound-based location, ultrasound sensing, guaranteed identification, or verified household recall. Small or blurred mosquitoes may be missed; patterns and other insects may cause false positives. Per-candidate model scores are not calibrated probabilities.
+Detects visual mosquito candidates in captured photos, including stationary objects. No sound-based direction finding (only a loudness-based proximity meter), ultrasound sensing, guaranteed identification, or verified household recall. Small or blurred mosquitoes may be missed; patterns and other insects may cause false positives. Per-candidate model scores are not calibrated probabilities.
 
 ## Precise capture
 The captured frame is scaled to at most 1920 px on the long side (1080p camera frames stay at native resolution), then analyzed as one full-frame pass plus overlapping 640 px tiles (25% overlap). Duplicates are removed by IoU NMS 0.35 plus a containment rule (a box ≥70% inside a higher-scoring box is dropped), which removes tile-edge clipped copies.

@@ -18,5 +18,5 @@ Paper: Kiskin et al., "HumBugDB: a large-scale acoustic mosquito dataset", NeurI
 Weights: neurips_2021_humbugdb_keras_bnn_best.hdf5 (SHA256 f2e81a8a5869e1fd1329db29bed68549db9cad8d4e1000ae415a5ac5f1c2a321), rebuilt as ONNX by export_humbug.py with MC dropout kept active (10 samples per analysis).
 Sound preprocessing matches MozzBNN/librosa: 8 kHz, STFT 2048/512 Hann centred reflect, 128 Slaney mel, power_to_db ref=max top_db=80, standardised per 1.92 s window (the original standardises per recording).
 Conversion check on MozzBNN's sample recording: 99.1% of 1.92 s windows agree with the published output (whole-recording normalisation); 96.8% with per-window normalisation used live.
-App-side gate: a hit also requires a 250-1000 Hz spectral peak >= 9.5 dB above the band median; 2 hits in the last 3 analyses mark a detection. Not validated on Korean species or indoor household noise.
+App-side gate: a hit also requires a 250-1000 Hz spectral peak >= 9.5 dB above the band median; 2 hits in the last 3 analyses mark a detection. Proximity meter: after an AI hit, the tracked wingbeat tone's level above the band median is shown as a loudness bar (single channel; no direction finding). Not validated on Korean species or indoor household noise.
 ONNX Runtime Web 1.22.0: Microsoft, MIT License, vendor/ONNXRUNTIME-LICENSE.txt.
